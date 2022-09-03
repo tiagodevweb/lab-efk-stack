@@ -94,15 +94,12 @@ kind delete clusters kind
 
 ## References
 
-- [Fluent Official Manual](https://docs.fluentbit.io/manual)
+- [Fluent Bit Official Manual](https://docs.fluentbit.io/manual)
 - [A Fluent Bit Tutorial: Shipping to Elasticsearch](https://logz.io/blog/fluent-bit-tutorial/)
 - [Managing application logs with EFK stack](http://www.inanzzz.com/index.php/post/4f7a/managing-application-logs-with-efk-stack-elasticsearch-fluent-bit-kibana-in-kubernetes)
 - [Fluent Bit kubernetes logging](https://github.com/fluent/fluent-bit-kubernetes-logging)
 - [Exporting Kubernetes Logs to Elasticsearch Using Fluent Bit](https://medium.com/kubernetes-tutorials/exporting-kubernetes-logs-to-elasticsearch-using-fluent-bit-758e8de606af)
 - [EFK Stack Setup (Elasticsearch, Fluent-bit and Kibana) for Kubernetes Log Management](https://www.studytonight.com/post/efk-stack-setup-elasticsearch-fluentbit-and-kibana-for-kubernetes-log-management)
-
-
-
 
 ## License
 
