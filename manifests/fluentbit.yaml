@@ -1,0 +1,162 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluentbit
+  namespace: logging
+  labels:
+    app: fluentbit
+ 
+---
+ 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fluentbit
+  labels:
+    app: fluentbit
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - namespaces
+    verbs:
+      - get
+      - list
+      - watch
+ 
+---
+ 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fluentbit
+roleRef:
+  kind: ClusterRole
+  name: fluentbit
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: fluentbit
+    namespace: logging
+ 
+---
+ 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentbit-config
+  namespace: logging
+  labels:
+    k8s-app: fluentbit
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         5
+        Log_Level     info
+        Daemon        Off
+        Parsers_File  parsers.conf
+        HTTP_Server   On
+        HTTP_Listen   0.0.0.0
+        HTTP_Port     2020
+    @INCLUDE input-kubernetes.conf
+    @INCLUDE filter-kubernetes.conf
+    @INCLUDE output-elasticsearch.conf
+  input-kubernetes.conf: |
+    [INPUT]
+        Name              tail
+        Tag               kube.*
+        Path              /var/log/containers/*.log
+        Exclude_Path      /var/log/containers/*_kube-system_*.log,/var/log/containers/*_kubernetes-dashboard_*.log,/var/log/containers/*_monitoring_*.log
+        Parser            docker
+        DB                /var/log/flb_kube.db
+        Mem_Buf_Limit     5MB
+        Skip_Long_Lines   On
+        Refresh_Interval  10
+  filter-kubernetes.conf: |
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+        Kube_Tag_Prefix     kube.var.log.containers.
+        Merge_Log           On
+        Merge_Log_Key       log_field
+        Merge_Log_Trim      On
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude Off
+  output-elasticsearch.conf: |
+    [OUTPUT]
+        Name         es
+        Host         ${FLUENT_ELASTICSEARCH_HOST}
+        Port         ${FLUENT_ELASTICSEARCH_PORT}
+        Match        *
+        Index        kubernetes-logs
+        Type         json
+        Replace_Dots On
+        Retry_Limit  False
+  parsers.conf: |
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On
+ 
+---
+ 
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentbit
+  namespace: logging
+  labels:
+    app: fluentbit
+spec:
+  selector:
+    matchLabels:
+      app: fluentbit
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: fluentbit
+    spec:
+      serviceAccount: fluentbit
+      serviceAccountName: fluentbit
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      containers:
+        - name: fluentbit
+          image: fluent/fluent-bit:1.3.11
+          ports:
+            - containerPort: 2020
+          env:
+            - name: FLUENT_ELASTICSEARCH_HOST
+              value: "elasticsearch"
+            - name: FLUENT_ELASTICSEARCH_PORT
+              value: "9200"
+          volumeMounts:
+            - name: fluentbit-config
+              mountPath: /fluent-bit/etc/
+            - name: fluentbit-log
+              mountPath: /var/log
+            - name: fluentbit-lib
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+      volumes:
+        - name: fluentbit-config
+          configMap:
+            name: fluentbit-config
+        - name: fluentbit-log
+          hostPath:
+            path: /var/log
+        - name: fluentbit-lib
+          hostPath:
+            path: /var/lib/docker/containers
