@@ -34,7 +34,7 @@ Create cluster
 ```bash
 kind create cluster --config kind.yaml
 ```
-![kind create cluster](/images/kind-create-cluster.png "kind create cluster")
+![kind create cluster](/images/create-cluster.png "kind create cluster")
 
 Deploy [random logger](https://github.com/chentex/random-logger)
 ```bash
